@@ -16,14 +16,14 @@ MOMENTUM=0.9
 # L2正則化の重み
 WEIGHT_DECAY = 1e-4
 
-EPOCHS = 15
+EPOCHS = 9
 
 # 学習率を変更するエポック数と変更後の学習率
 LEARNING_SCHEDULE = {
     "learning_rate": {
-        5: 0.001,
-        8: 0.0001,
-        10: 0.00001,
+        2: 0.001,
+        4: 0.0001,
+        6: 0.00001,
     }
 }
 
@@ -37,10 +37,10 @@ SL_VALUE_WEIGHT = 0.02
 RL_VALUE_WEIGHT = 1.0
 
 # 自己対戦時の探索回数
-SELF_PLAY_VISITS = 16
+SELF_PLAY_VISITS = 32
 
 # 自己対戦実行ワーカ数
-NUM_SELF_PLAY_WORKERS = 4
+NUM_SELF_PLAY_WORKERS = 8
 
 # 1回の学習ごとに生成する棋譜の数
-NUM_SELF_PLAY_GAMES = 10000
+NUM_SELF_PLAY_GAMES = 5000

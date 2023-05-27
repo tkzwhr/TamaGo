@@ -5,6 +5,7 @@ import numpy as np
 from board.constant import PASS
 from board.go_board import GoBoard
 from board.stone import Stone
+from common.print_console import print_err
 
 
 def generate_input_planes(board: GoBoard, color: Stone, sym: int=0) -> np.ndarray:
@@ -23,6 +24,10 @@ def generate_input_planes(board: GoBoard, color: Stone, sym: int=0) -> np.ndarra
     # 手番が白の時は石の色を反転する.
     if color is Stone.WHITE:
         board_data = [datum if datum == 0 else (3 - datum) for datum in board_data]
+
+    # print_err("===")
+    # print_err(np.array(board_data).reshape(board_size, board_size))
+    # print_err("---")
 
     # 碁盤の各交点の状態
     #     空点 : 1枚目の入力面
@@ -50,9 +55,83 @@ def generate_input_planes(board: GoBoard, color: Stone, sym: int=0) -> np.ndarra
     color_plane = np.ones(shape=(1, board_size**2))
     if color == Stone.WHITE:
         color_plane = color_plane * -1
+    
+    # input_data = np.concatenate([board_plane, history_plane, pass_plane, color_plane]) \
+    # .reshape(6, board_size, board_size).astype(np.float32) # pylint: disable=E1121
 
-    input_data = np.concatenate([board_plane, history_plane, pass_plane, color_plane]) \
-        .reshape(6, board_size, board_size).astype(np.float32) # pylint: disable=E1121
+    # ここから新しい入力特徴
+
+    # 自分と相手の空きダメの数 (7～12番目の入力面)
+    #   4以上は安全
+    #   3は要注意
+    #   2以下は危険
+    def align_lib(board: GoBoard, pos: int) -> int:
+        num = board.strings.get_num_liberties(pos)
+        if num == 1:
+            return 2
+        elif num > 4:
+            return 4
+        else:
+            return num
+        
+    lib_array = [align_lib(board, pos) for pos in board.onboard_pos]
+
+    my_lib_array = [int(lib_array[i] * board_plane[1][i]) for i in range(board_size**2)]
+    my_lib_plane = (np.identity(5)[my_lib_array]).transpose()[2:5]
+    opponent_lib_array = [int(lib_array[i] * board_plane[2][i]) for i in range(board_size**2)]
+    opponent_lib_plane = (np.identity(5)[opponent_lib_array]).transpose()[2:5]
+
+    # 単独の石にツケてきた場合、2目にナラビの場合は気にしたほうが良い
+
+    previous_move_neighbors = board.strings.get_neighbor4(previous_move)
+
+    def size(board: GoBoard, pos: int):
+        string = board.strings.string[board.strings.get_id(pos)]
+        if string.exist():
+            return string.get_size()
+        else:
+            return 0
+    def libs(board: GoBoard, pos: int):
+        string = board.strings.string[board.strings.get_id(pos)]
+        if string.exist():
+            return string.get_num_liberties()
+        else:
+            return 0
+
+    previous_move_size = [previous_move, size(board, previous_move), libs(board, previous_move)]
+    previous_move_neighbors_sizes = [[pos, size(board, pos), libs(board, pos)] for pos in previous_move_neighbors]
+    previous_move_neighbors_sizes.append(previous_move_size)
+    
+    # 単独の石にツケてきた
+
+    previous_move_singles = [data[0] for data in previous_move_neighbors_sizes if data[1] == 1 and data[2] == 3]
+    if len(previous_move_singles) == 2:
+        previous_move_single_plane = np.array([1 if board.get_symmetrical_coordinate(pos, sym) in previous_move_singles \
+            else 0 for pos in board.onboard_pos]).reshape(1, board_size**2)
+    else:
+        previous_move_single_plane = np.zeros(shape=(1, board_size ** 2))
+
+    # 2目にナラビ
+
+    previous_move_two_lines = [data[0] for data in previous_move_neighbors_sizes if data[1] == 2 and data[2] <= 4]
+    if len(previous_move_two_lines) == 3:
+        stones2d = [board.strings.get_stone_coordinates(board.strings.get_id(pos)) for pos in previous_move_two_lines]
+        stones = [x for row in stones2d for x in row]
+        previous_move_two_lines_plane = np.array([1 if board.get_symmetrical_coordinate(pos, sym) in stones \
+            else 0 for pos in board.onboard_pos]).reshape(1, board_size**2)
+    else:
+        previous_move_two_lines_plane = np.zeros(shape=(1, board_size ** 2))
+
+    input_data = np.concatenate([
+        board_plane,
+        history_plane,
+        pass_plane,
+        color_plane,
+        my_lib_plane,
+        opponent_lib_plane,
+        previous_move_single_plane,
+        previous_move_two_lines_plane
+    ]).reshape(14, board_size, board_size).astype(np.float32) # pylint: disable=E1121
 
     return input_data
 

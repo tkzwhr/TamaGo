@@ -1,6 +1,6 @@
 """プログラムの情報。
 """
-PROGRAM_NAME="TamaGo"
+PROGRAM_NAME="HiroGo"
 PROTOCOL_VERSION="2"
 
 # Version 0.0.0 : ランダムプレイヤの実装。
